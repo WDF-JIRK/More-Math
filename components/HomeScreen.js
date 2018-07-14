@@ -12,9 +12,9 @@ export default class HomeScreen extends React.Component {
           style={{ width: 300, height: 100, alignSelf: 'center' }}
         />
         <Button
-          title="Start Game 1"
+          title="Start Pattern Mesh"
           onPress={() => {
-            navigate('GameOver');
+            navigate('PatternMesh');
           }}
         />
         <Button
