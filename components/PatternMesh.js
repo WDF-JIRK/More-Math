@@ -1,5 +1,24 @@
 import React from 'react';
 import { StyleSheet, Text, View, Button } from 'react-native';
+import * as _ from 'lodash'
+import { StackActions, NavigationActions } from 'react-navigation';
+
+const styles = StyleSheet.create({
+	container: {
+	  flex: 1,
+	  backgroundColor: '#fff',
+	  alignItems: 'center',
+	  justifyContent: 'center',
+	},
+	pattern: {
+		borderWidth: 4,
+		borderColor: '#000',
+		borderRadius: 4
+	},
+	selectedPattern: {
+		backgroundColor: '#d3d3d3'
+	}
+  })
 
 const picked = (length) => Math.floor(Math.random() * length)
 
@@ -30,6 +49,11 @@ const patternData = [
 		name: 'B',
 		subPatterns: [1,3],
 		description: 'is really cool'
+	},
+	{
+		name: 'C',
+		subPatterns: [2,3],
+		description: 'is amazing'
 	}
 ]
 
@@ -41,11 +65,15 @@ export default class PatternMesh extends React.Component {
 		this.state = {
 			score: 0,
 			currentPattern: {},
-			patternsUsed: []
+			patternsUsed: [],
+			selectedPatterns: [],
+			availableSelections: []
 		}
 		this.gameStart = this.gameStart.bind(this)
 		this.pickRandomPattern = this.pickRandomPattern.bind(this)
 		this.generateSelection = this.generateSelection.bind(this)
+		this.selectPattern = this.selectPattern.bind(this)
+		this.checkMatch = this.checkMatch.bind(this)
 	}
 
 	componentDidMount(){
@@ -53,7 +81,8 @@ export default class PatternMesh extends React.Component {
 	}
 
 	gameStart(){
-		this.pickRandomPattern()
+		const current = this.pickRandomPattern()
+		this.generateSelection(current)
 	}
 
 	pickRandomPattern(){
@@ -64,31 +93,80 @@ export default class PatternMesh extends React.Component {
 			currentPattern: patternData[selectedPattern],
 			patternsUsed: [...this.state.patternsUsed, selectedPattern]
 		})
+
+		return patternData[selectedPattern]
 	}
 
-	generateSelection(){
-		console.log('**************************', this.state.currentPattern)
-		if(!Object.keys(this.state.currentPattern).length) return null
-		const correctSelections = this.state.currentPattern.subPatterns.map((pattern,i) => (
-			<View>
-				<Text key={i}>{pattern}</Text>
-			</View>
-		))
-		let randomSelectedOne = picked(selections.length)
-		while(this.state.currentPattern.subPatterns.includes(randomSelectedOne)) randomSelectedOne = picked(selections.length)
-		let randomSelectedTwo = picked(selections.length)
-		while(this.state.currentPattern.subPatterns.includes(randomSelectedTwo)) randomSelectedTwo = picked(selections.length)
+	generateSelection(current){
+		// if(!Object.keys(this.state.currentPattern).length) return null
+		const correctSelections = current.subPatterns
 
-		const randomSelections = [randomSelectedOne, randomSelectedTwo].map((pattern,i) => (
-			<View>
-				<Text key={i}>{pattern}</Text>
-			</View>
-		))
+		let randomSelectedOne = picked(selections.length)
+		while(current.subPatterns.includes(randomSelectedOne)) randomSelectedOne = picked(selections.length)
+		let randomSelectedTwo = picked(selections.length)
+		while(current.subPatterns.includes(randomSelectedTwo) && randomSelectedTwo !== randomSelectedOne) randomSelectedTwo = picked(selections.length)
+
+		const randomSelections = [randomSelectedOne, randomSelectedTwo]
 
 		const rawSelections = [...correctSelections, ...randomSelections]
 		const shuffledSelections = shuffle(rawSelections)
 
-		return shuffledSelections
+		this.setState({
+			availableSelections: shuffledSelections
+		})
+	}
+
+	selectPattern(patternNum){
+		console.log('selecting pattern!!!')
+		let newSelection = []
+		if(this.state.selectedPatterns.includes(patternNum)){
+			newSelection = this.state.selectedPatterns.filter(pattern => pattern !== patternNum)
+			this.setState({
+				selectedPatterns: newSelection
+			})
+		}else{
+			newSelection = [...this.state.selectedPatterns, patternNum]
+			this.setState({
+				selectedPatterns: newSelection
+			})
+		}
+		this.checkMatch(newSelection)
+	}
+
+	checkMatch(selectedPatterns){
+		// console.log('Checking for match!')
+		// console.log('Thisnis selected: ', selectedPatterns,selectedPatterns.length)
+		const { navigate } = this.props.navigation
+		const { currentPattern } = this.state
+		if (selectedPatterns.length === 2) {
+			if(!_.difference(selectedPatterns, currentPattern.subPatterns).length){
+				if(this.state.patternsUsed.length !== patternData.length) {
+					this.gameStart()
+				}else{
+					console.log('ALL LEVELS COMPLETED!')
+				}
+				this.setState({
+					score: this.state.score + 1,
+					selectedPatterns: []
+				})
+			}else{
+				console.log('WRONG!', this.props.navigation)
+				// const replacer = StackActions.replace({
+				// 	key: 'PatternMesh',
+				// 	routeName: 'GameOver',
+				// 	params: {score: this.state.score}
+				// })
+				const replacer = StackActions.reset({
+					index: 1,
+					actions: [
+						NavigationActions.navigate({routeName: 'Home'}),
+						NavigationActions.navigate({routeName: 'GameOver', params: {score: this.state.score}})
+					]
+				})
+				this.props.navigation.dispatch(replacer)
+				// navigate('GameOver', {score: this.state.score})
+			}
+		}
 	}
 
 	render() { 
@@ -96,9 +174,14 @@ export default class PatternMesh extends React.Component {
 		return (
 			<View style={styles.container}>
 				<Text>Choose the patterns that {pattern.description}</Text>
+				<Text>{this.state.score}</Text>
 				<View>
 					{
-						this.generateSelection()
+						this.state.availableSelections.map((pattern,i) => (
+							<View style={this.state.selectedPatterns.includes(pattern) ? styles.pattern : null}>
+								<Button onPress={() => this.selectPattern(pattern)} color="#aaa" key={i} title={(pattern).toString()}/>
+							</View>
+						))
 					}
 				</View>
 
@@ -107,17 +190,3 @@ export default class PatternMesh extends React.Component {
 	}
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pattern: {
-	  backgroundColor: '#f4f4f4'
-  },
-  selectedPattern: {
-	  backgroundColor: '#d3d3d3'
-  }
-})
